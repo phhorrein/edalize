@@ -44,10 +44,10 @@ EXTRA_OPTIONS ?= $(VSIM_OPTIONS) $(addprefix -g,$(PARAMETERS)) $(addprefix +,$(P
 all: work $(VPI_MODULES)
 
 run: work $(VPI_MODULES)
-	$(VSIM) -do "run -all; quit -code [expr [coverage attribute -name TESTSTATUS -concise] >= 2 ? [coverage attribute -name TESTSTATUS -concise] : 0]; exit" -c $(addprefix -pli ,$(VPI_MODULES)) $(EXTRA_OPTIONS) $(TOPLEVEL)
+	$(VSIM) -do "do edalize_run_main.tcl" -c $(addprefix -pli ,$(VPI_MODULES)) $(EXTRA_OPTIONS) $(TOPLEVEL)
 
 run-gui: work $(VPI_MODULES)
-	$(VSIM) -gui $(addprefix -pli ,$(VPI_MODULES)) $(EXTRA_OPTIONS) $(TOPLEVEL)
+	$(VSIM) -do "do edalize_run_main.tcl" -gui $(addprefix -pli ,$(VPI_MODULES)) $(EXTRA_OPTIONS) $(TOPLEVEL)
 
 work:
 	$(VSIM) -c -do "do edalize_main.tcl; exit"
@@ -89,9 +89,10 @@ class Modelsim(Edatool):
                          'desc' : 'Additional run options for vsim'},
                         ]}
 
-    def _write_build_rtl_tcl_file(self, tcl_main):
+    def _write_build_rtl_tcl_file(self):
         tcl_build_rtl  = open(os.path.join(self.work_root, "edalize_build_rtl.tcl"), 'w')
-
+        tcl_main = open(os.path.join(self.work_root, "edalize_run_main.tcl"), 'w')
+        tcl_main.write("onerror { quit -code 1; }\n")
         (src_files, incdirs) = self._get_fileset_files()
         vlog_include_dirs = ['+incdir+'+d.replace('\\','/') for d in incdirs]
 
@@ -143,6 +144,12 @@ class Modelsim(Edatool):
                 args += [f.name.replace('\\','/')]
                 tcl_build_rtl.write("{} {}\n".format(cmd, ' '.join(args)))
 
+        tcl_main.write("run -all\n")
+        tcl_main.write("quit -code [expr [coverage attribute -name TESTSTATUS -concise] >= 2 ? [coverage attribute -name TESTSTATUS -concise] : 0]\n")
+        tcl_main.write("exit\n")
+        tcl_main.close()
+
+
     def _write_makefile(self):
         vpi_make = open(os.path.join(self.work_root, "Makefile"), 'w')
         _parameters = []
@@ -180,13 +187,13 @@ class Modelsim(Edatool):
         vpi_make.close()
 
     def configure_main(self):
-        tcl_main = open(os.path.join(self.work_root, "edalize_main.tcl"), 'w')
-        tcl_main.write("onerror { quit -code 1; }\n")
-        tcl_main.write("do edalize_build_rtl.tcl\n")
+        tcl_build_main = open(os.path.join(self.work_root, "edalize_main.tcl"), 'w')
+        tcl_build_main.write("onerror { quit -code 1; }\n")
+        tcl_build_main.write("do edalize_build_rtl.tcl\n")
 
-        self._write_build_rtl_tcl_file(tcl_main)
+        self._write_build_rtl_tcl_file()
+
         self._write_makefile()
-        tcl_main.close()
 
     def run_main(self, with_gui=False):
         args = []

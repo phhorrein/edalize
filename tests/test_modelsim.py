@@ -18,6 +18,7 @@ def test_modelsim(make_edalize_test):
 
     tf.compare_files(['Makefile',
                       'edalize_build_rtl.tcl',
+                      'edalize_run_main.tcl',
                       'edalize_main.tcl'])
 
     orig_env = os.environ.copy()
